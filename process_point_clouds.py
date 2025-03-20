@@ -3,45 +3,39 @@ from pathlib import Path
 
 import h5py  # type: ignore
 import numpy as np
+import numpy.typing as npt  # type: ignore
 import pandas as pd  # type: ignore
 from tqdm import tqdm  # type: ignore
-
-# Get ids and times of files used in experiment
-with h5py.File("data/sim_ids_and_times.jld2", "r") as f:
-    sims = f["sims"][:]
-    dereferenced_sims = [
-        f[ref][:]
-        for ref in sims
-    ]
-ids_and_times = np.array(dereferenced_sims)
-
-# Get files containing point clouds used in experiment
-point_clouds_path = Path("data/point_clouds")
-files = [
-    (
-        point_clouds_path
-        / f"ID-{id}_time-{time}_From2ParamSweep_Data.csv"
-    )
-    for id, time in ids_and_times
-]
 
 
 def process_point_cloud(
         point_cloud_file: Path,
         overwrite: bool = False,
-    ) -> None:
-    """Processes file containing point cloud and produces and saves two
-    NumPy-arrays that contain the xy-coordinates and the labels of the cells,
-    respectively, as well as an `int` representing the M1/M2-dominance of the
-    point cloud. The labels of the cells are one of `"M"`, `"T"`, `"V"` and
-    `"N"`. For the label of the point cloud, `0` and `1` correspond to M1- and
-    M2-dominance, respectively.
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.str_], int]:
+    """Processes file containing point cloud and produces and saves the output
+    in two NumPy-arrays that contain the xy-coordinates and the labels of the
+    cells, respectively, as well as an `int` representing the M1/M2-dominance
+    of the point cloud.
+
+    Args:
+        point_cloud_file (Path): Path to CSV-file containing point cloud data.
+        overwrite (bool, optional): Whether or not to overwrite existing
+            output. Defaults to False.
+
+    Returns:
+        tuple[npt.NDArray[np.float64], npt.NDArray[np.str_], int]: Tuple
+            containing
+            - a NumPy-array of shape (n_cells, 2) containing the xy-coordinates
+            of the cells;
+            - a NumPy-array of shape (n_cells,) containing the labels of the
+            cells, where each label is one of `"M"`, `"T"`, `"V"` and `"N"`;
+            - an integer representing the M1/M2-dominance of the point-cloud,
+            where `0` and `1` correspond to M1- and M2-dominance, respectively.
     """
-    file_out = Path(
-        str(point_cloud_file.with_suffix(".npz")).replace(
-            "point_clouds", "point_clouds_processed"
-        )
-    )
+    file_out = (
+        Path("outfiles/point_clouds_processed")
+        / point_cloud_file.name
+    ).with_suffix(".npz")
     if not file_out.is_file() or overwrite:
         file_out.parent.mkdir(parents=True, exist_ok=True)
         df = pd.read_csv(point_cloud_file)
@@ -68,21 +62,41 @@ def process_point_cloud(
             npz_file[key]
             for key in npz_file
         ]
-    return
+    return cells, cells_labels, point_cloud_label
 
 
 if __name__ == "__main__":
+    # Get ids and times of files used in experiment
+    with h5py.File("data/sim_ids_and_times.jld2", "r") as f:
+        sims = f["sims"][:]
+        dereferenced_sims = [
+            f[ref][:]
+            for ref in sims
+        ]
+    ids_and_times = np.array(dereferenced_sims)
+    # Get files containing point clouds used in experiment
+    point_clouds_path = Path("data/point_clouds")
+    point_cloud_files = [
+        (
+            point_clouds_path
+            / f"ID-{id}_time-{time}_From2ParamSweep_Data.csv"
+        )
+        for id, time in ids_and_times
+    ]
     overwrite, verbose = sys.argv[1] == "True", sys.argv[2] == "True"
-    for file in tqdm(files, desc="Processing data"):
+    for point_cloud_file in tqdm(
+        point_cloud_files,
+        desc="Processing point clouds",
+    ):
         try:
             process_point_cloud(
-                file,
+                point_cloud_file,
                 overwrite=overwrite,
             )
             if verbose:
                 tqdm.write(
-                    f"Processed point cloud data at `{file}`."
+                    f"Processed point cloud data at `{point_cloud_file}`."
                 )
         except FileNotFoundError:
             if verbose:
-                tqdm.write(f"File {file} not found, skipping.")
+                tqdm.write(f"File {point_cloud_file} not found, skipping.")
