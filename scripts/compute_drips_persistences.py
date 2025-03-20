@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt  # type: ignore
-from dowker_complex import DowkerComplex  # type: ignore
+from drips_complex import DripsComplex  # type: ignore
 from sklearn.base import clone  # type: ignore
 from tqdm import tqdm  # type: ignore
 
@@ -12,10 +12,10 @@ from tqdm import tqdm  # type: ignore
 def compute_persistences(
         point_cloud_file: Path,
         overwrite: bool = False,
-    ) -> list[list[npt.NDArray[np.float64]]]:
-    """Compute the required Dwoker persistences from a processed point cloud
-    and saves the output as a list containing the 0- and 1-dimensional homology
-    of each label combination.
+    ) -> list[list[npt.NDArray[np.float32]]]:
+    """Compute the required Dowker-Rips persistences from a processed point
+    cloud and saves the output as a list containing the 0- and 1-dimensional
+    homology of each label combination.
 
     Args:
         point_cloud_file (Path): Path to .npz-file containing processed point
@@ -24,9 +24,9 @@ def compute_persistences(
             output. Defaults to False.
 
     Returns:
-        list[list[npt.NDArray[np.float64]]]: The persistent homologies computed
-            from the Dowker simplicial complex. The format of this data is a
-            list of lists of NumPy-arrays of shape `(n_generators, 2)`, with
+        list[list[npt.NDArray[np.float32]]]: The persistent homologies computed
+            from the Dowker-Rips simplicial complex. The format of this data is
+            a list of lists of NumPy-arrays of shape `(n_generators, 2)`, with
             one entry for each of the label combinations (macrophage, vessel),
             (tumor, vessel) and (macrophage, tumor). The i-th entry of each
             entry of this list is an array containing the birth and death times
@@ -35,9 +35,9 @@ def compute_persistences(
             from consecutive homological dimensions.
     """
     file_out = (
-        Path("outfiles/dowker_persistences")
+        Path("outfiles/drips_persistences")
         / point_cloud_file.name
-    ).with_suffix(".npz")
+    ).with_suffix(".pkl")
     if not file_out.is_file() or overwrite:
         file_out.parent.mkdir(parents=True, exist_ok=True)
         persistences = []
@@ -51,7 +51,8 @@ def compute_persistences(
             ("T", "V"),
             ("M", "T"),
         ]
-        drc = DowkerComplex(
+        drc = DripsComplex(
+            n_threads=-1,
             swap=True,
         )
         for vertex_label, witness_label in cell_label_combinations:
@@ -76,7 +77,7 @@ if __name__ == "__main__":
     overwrite, verbose = sys.argv[1] == "True", sys.argv[2] == "True"
     for processed_point_cloud_file in tqdm(
         processed_point_cloud_files,
-        desc="Computing Dowker persistences",
+        desc="Computing Dowker-Rips persistences",
     ):
         compute_persistences(
             processed_point_cloud_file,
@@ -84,6 +85,6 @@ if __name__ == "__main__":
         )
         if verbose:
             tqdm.write(
-                f"Computed Dowker persistence of processed point cloud at "
-                f"`{processed_point_cloud_file}`."
+                "Computed Dowker-Rips persistence of processed point cloud "
+                f"at `{processed_point_cloud_file}`."
             )
