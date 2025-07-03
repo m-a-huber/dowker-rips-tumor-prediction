@@ -36,7 +36,7 @@ def compute_persistence_images(
             as the concatenation of the six flattened persistence images.
     """
     file_out = (
-        Path("outfiles/drips_persistence_images")
+        Path("outfiles/dowker_rips_persistence_images")
         / persistences_file.name
     ).with_suffix(".npy")
     if not file_out.is_file() or overwrite:
@@ -61,7 +61,7 @@ def compute_persistence_images(
 
 if __name__ == "__main__":
     persistences_files = list(
-        Path("outfiles/drips_persistences").iterdir()
+        Path("outfiles/dowker_rips_persistences").iterdir()
     )
     overwrite, verbose = sys.argv[1] == "True", sys.argv[2] == "True"
     for persistences_file in tqdm(

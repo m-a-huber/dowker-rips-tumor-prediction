@@ -140,7 +140,7 @@ def compute_SVM_accuracies(
         verbose: int,
         overwrite: bool = False,
     ) -> npt.NDArray:
-    file_out = Path("outfiles/accuracies_drips.pkl")
+    file_out = Path("outfiles/accuracies_dowker_rips.pkl")
     if not file_out.is_file() or overwrite:
         scaler = _UnitRangeTransform(verbose=bool(verbose))
         X_scaled = scaler.fit_transform(X)
@@ -162,7 +162,7 @@ def compute_SVM_accuracies(
 
 if __name__ == "__main__":
     overwrite, verbose = sys.argv[1] == "True", int(sys.argv[2])
-    persistence_images_dir = Path("outfiles/drips_persistence_images")
+    persistence_images_dir = Path("outfiles/dowker_rips_persistence_images")
     X, y = get_data(persistence_images_dir)
     accuracies = compute_SVM_accuracies(
         X,

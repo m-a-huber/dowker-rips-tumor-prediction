@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt  # type: ignore
-from drips_complex import DripsComplex  # type: ignore
+from dowker_rips_complex import DowkerRipsComplex  # type: ignore
 from sklearn.base import clone  # type: ignore
 from tqdm import tqdm  # type: ignore
 
@@ -35,7 +35,7 @@ def compute_persistences(
             from consecutive homological dimensions.
     """
     file_out = (
-        Path("outfiles/drips_persistences")
+        Path("outfiles/dowker_rips_persistences")
         / point_cloud_file.name
     ).with_suffix(".pkl")
     if not file_out.is_file() or overwrite:
@@ -51,7 +51,7 @@ def compute_persistences(
             ("T", "V"),
             ("M", "T"),
         ]
-        drc = DripsComplex(
+        drc = DowkerRipsComplex(
             n_threads=-1,
             swap=True,
         )

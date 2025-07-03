@@ -1,12 +1,12 @@
 [project]
-name = "drips-multiplex-relations"
+name = "multiplex-relations"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "dowker-complex",
-    "drips-complex",
+    "dowker-rips-complex",
     "h5py>=3.13.0",
     "imblearn>=0.0",
     "numpy>=2.1.3",
@@ -18,7 +18,7 @@ dependencies = [
 [tool.uv.sources]
 myplot = { path = "../myplot", editable = true }
 dowker-complex = { path = "../dowker_complex", editable = true }
-drips-complex = { path = "../drips_complex", editable = true }
+dowker-rips-complex = { path = "../dowker_rips_complex", editable = true }
 
 [dependency-groups]
 dev = [
