@@ -1,5 +1,4 @@
 import pickle
-import sys
 from pathlib import Path
 from typing import Optional
 
@@ -66,7 +65,7 @@ def get_data(
             / persistence_images_path.name
         ).with_suffix(".npz")
         npz_file = np.load(point_cloud_path, allow_pickle=True)
-        cells, cells_labels, point_cloud_label = [
+        _, _, point_cloud_label = [
             npz_file[key]
             for key in npz_file
         ]
@@ -79,22 +78,23 @@ def _train_svm(
         X: npt.NDArray,
         y: npt.NDArray,
         verbose: int,
-    ) -> tuple[float, float, float]:
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.3, random_state=42
+        random_state: Optional[int] = None,
+    ) -> tuple[float, float]:
+    X_train, _, y_train, _ = train_test_split(
+        X, y, test_size=0.3, random_state=random_state
     )
     param_dist = {
         "svc__C": loguniform(1e-6, 1000.0),
         "svc__gamma": loguniform(1e-6, 1000.0),
     }
-    sm = SMOTE(random_state=42)
+    sm = SMOTE(random_state=random_state)
     clf = SVC()
     svm_pipeline = Pipeline([("smote", sm), ("svc", clf)])
     random_search = RandomizedSearchCV(
         svm_pipeline,
         param_dist,
         n_iter=500,
-        random_state=41,
+        random_state=random_state,
         refit=True,
         verbose=verbose,
     )
@@ -102,8 +102,7 @@ def _train_svm(
     best_params = random_search.best_params_
     C = best_params.get("svc__C", "Error")
     gamma = best_params.get("svc__gamma", "Error")
-    score = random_search.score(X_test, y_test)
-    return score, C, gamma
+    return C, gamma
 
 
 def _repeat_svm(
@@ -111,20 +110,22 @@ def _repeat_svm(
     y: npt.NDArray,
     C: float,
     gamma: float,
-    n_repeats: int = 10
+    n_repeats: int = 10,
+    random_state: Optional[int] = None,
 ) -> npt.NDArray:
     accuracies = []
     for _ in tqdm(
         range(n_repeats),
         desc="Fitting SVMs"
     ):
-        shuffled_ixs = np.random.permutation(len(X))
+        rng = np.random.default_rng(random_state)
+        shuffled_ixs = rng.permutation(len(X))
         X = X[shuffled_ixs]
         y = y[shuffled_ixs]
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.3, random_state=42
+            X, y, test_size=0.3, random_state=random_state
         )
-        sm = SMOTE(random_state=41)
+        sm = SMOTE(random_state=random_state)
         clf = SVC(C=C, gamma=gamma)
         svm_pipeline = Pipeline([("smote", sm), ("svc", clf)])
         svm_pipeline.fit(X_train, y_train)
@@ -137,14 +138,15 @@ def _repeat_svm(
 def compute_SVM_accuracies(
         X: npt.NDArray,
         y: npt.NDArray,
+        complex: str,
         verbose: int,
         overwrite: bool = False,
     ) -> npt.NDArray:
-    file_out = Path("outfiles/accuracies_dowker_rips.pkl")
+    file_out = Path(f"outfiles/accuracies_{complex}.pkl")
     if not file_out.is_file() or overwrite:
         scaler = _UnitRangeTransform(verbose=bool(verbose))
         X_scaled = scaler.fit_transform(X)
-        score, C, gamma = _train_svm(X_scaled, y, verbose)
+        C, gamma = _train_svm(X_scaled, y, verbose)
         accuracies = _repeat_svm(
             X_scaled,
             y,
@@ -158,17 +160,3 @@ def compute_SVM_accuracies(
         with open(file_out, "rb") as f_in:
             accuracies = pickle.load(f_in)
     return accuracies
-
-
-if __name__ == "__main__":
-    overwrite, verbose = sys.argv[1] == "True", int(sys.argv[2])
-    persistence_images_dir = Path("outfiles/dowker_rips_persistence_images")
-    X, y = get_data(persistence_images_dir)
-    accuracies = compute_SVM_accuracies(
-        X,
-        y,
-        verbose=verbose,
-        overwrite=overwrite,
-    )
-    if verbose:
-        print(f"Accuracies are: {accuracies}")

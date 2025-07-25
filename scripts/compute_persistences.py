@@ -1,31 +1,33 @@
 import pickle
-import sys
 from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt  # type: ignore
 from dowker_complex import DowkerComplex  # type: ignore
+from dowker_rips_complex import DowkerRipsComplex  # type: ignore
 from sklearn.base import clone  # type: ignore
-from tqdm import tqdm  # type: ignore
 
 
 def compute_persistences(
+        complex: str,
         point_cloud_file: Path,
         overwrite: bool = False,
     ) -> list[list[npt.NDArray[np.float64]]]:
-    """Compute the required Dwoker persistences from a processed point cloud
-    and saves the output as a list containing the 0- and 1-dimensional homology
-    of each label combination.
+    """Compute the required persistences from a processed point cloud and saves
+    the output as a list containing the 0- and 1-dimensional homology of each
+    label combination.
 
     Args:
+        complex (str): Which complex to construct and compute persistence of.
+            Must be one of `"dowker"` and `"dowker_rips"`.
         point_cloud_file (Path): Path to .npz-file containing processed point
             cloud data.
         overwrite (bool, optional): Whether or not to overwrite existing
             output. Defaults to False.
 
     Returns:
-        list[list[npt.NDArray[np.float64]]]: The persistent homologies computed
-            from the Dowker simplicial complex. The format of this data is a
+        list[list[npt.NDArray[np.float]]]: The persistent homologies computed
+            from the deisred simplicial complex. The format of this data is a
             list of lists of NumPy-arrays of shape `(n_generators, 2)`, with
             one entry for each of the label combinations (macrophage, vessel),
             (tumor, vessel) and (macrophage, tumor). The i-th entry of each
@@ -35,14 +37,14 @@ def compute_persistences(
             from consecutive homological dimensions.
     """
     file_out = (
-        Path("outfiles/dowker_persistences")
+        Path(f"outfiles/{complex}_persistences")
         / point_cloud_file.name
     ).with_suffix(".pkl")
     if not file_out.is_file() or overwrite:
         file_out.parent.mkdir(parents=True, exist_ok=True)
         persistences = []
         npz_file = np.load(point_cloud_file, allow_pickle=True)
-        cells, cells_labels, point_cloud_label = [
+        cells, cells_labels, _ = [
             npz_file[key]
             for key in npz_file
         ]
@@ -51,13 +53,24 @@ def compute_persistences(
             ("T", "V"),
             ("M", "T"),
         ]
-        drc = DowkerComplex(
-            swap=True,
-        )
+        if complex == "dowker":
+            complex = DowkerComplex(
+                swap=True,
+            )
+        elif complex == "dowker_rips":
+            complex = DowkerRipsComplex(
+                n_threads=-1,
+                swap=True,
+            )
+        else:
+            raise ValueError(
+                "Got invalid value for `complex`; must be one of `'dowker'`"
+                "and `'dowker_rips'`."
+            )
         for vertex_label, witness_label in cell_label_combinations:
             vertices = cells[cells_labels == vertex_label]
             witnesses = cells[cells_labels == witness_label]
-            persistence = clone(drc).fit_transform(
+            persistence = clone(complex).fit_transform(
                 [vertices, witnesses]
             )
             persistences.append(persistence)
@@ -67,23 +80,3 @@ def compute_persistences(
         with open(file_out, "rb") as f_in:
             persistences = pickle.load(f_in)
     return persistences
-
-
-if __name__ == "__main__":
-    processed_point_cloud_files = list(
-        Path("outfiles/point_clouds_processed").iterdir()
-    )
-    overwrite, verbose = sys.argv[1] == "True", sys.argv[2] == "True"
-    for processed_point_cloud_file in tqdm(
-        processed_point_cloud_files,
-        desc="Computing Dowker persistences",
-    ):
-        compute_persistences(
-            processed_point_cloud_file,
-            overwrite=overwrite,
-        )
-        if verbose:
-            tqdm.write(
-                f"Computed Dowker persistence of processed point cloud at "
-                f"`{processed_point_cloud_file}`."
-            )

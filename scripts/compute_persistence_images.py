@@ -1,11 +1,9 @@
 import pickle
-import sys
 from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt  # type: ignore
 from gudhi.representations import PersistenceImage  # type: ignore
-from tqdm import tqdm  # type: ignore
 
 
 def drop_infty(dim):
@@ -19,15 +17,17 @@ def weight(pt):  # Default weight function used in `PersistenceDiagrams.jl`
 
 
 def compute_persistence_images(
+        complex: str,
         persistences_file: Path,
         overwrite: bool = False,
     ) -> npt.NDArray[np.float64]:
-    """Compute and concatenate the required persistence landscapes of the
-    Dowker-Rips persistences and saves the output as a NumPy-array.
+    """Compute and concatenate the desired persistence images from the
+    persistences and saves the output as a NumPy-array.
 
     Args:
-        persistences_file (Path): Path to .pkl-file containing Dowker-Rips
-            persistences.
+        complex (str): Underlying complex from whose persistences the images
+            will be computed. Must be one of `"dowker"` and `"dowker_rips"`.
+        persistences_file (Path): Path to .pkl-file containing persistences.
         overwrite (bool, optional): Whether or not to overwrite existing
             output. Defaults to False.
 
@@ -36,7 +36,7 @@ def compute_persistence_images(
             as the concatenation of the six flattened persistence images.
     """
     file_out = (
-        Path("outfiles/dowker_rips_persistence_images")
+        Path(f"outfiles/{complex}_persistence_images")
         / persistences_file.name
     ).with_suffix(".npy")
     if not file_out.is_file() or overwrite:
@@ -57,23 +57,3 @@ def compute_persistence_images(
     else:
         persistence_images = np.load(file_out)
     return persistence_images
-
-
-if __name__ == "__main__":
-    persistences_files = list(
-        Path("outfiles/dowker_rips_persistences").iterdir()
-    )
-    overwrite, verbose = sys.argv[1] == "True", sys.argv[2] == "True"
-    for persistences_file in tqdm(
-        persistences_files,
-        desc="Computing Dowker-Rips persistence images",
-    ):
-        compute_persistence_images(
-            persistences_file,
-            overwrite=overwrite,
-        )
-        if verbose:
-            tqdm.write(
-                "Computed Dowker-Rips persistence image of persistences "
-                f"at `{persistences_file}`."
-            )
