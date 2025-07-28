@@ -1,4 +1,3 @@
-import pickle
 from pathlib import Path
 from typing import Optional
 
@@ -17,7 +16,7 @@ from tqdm import tqdm  # type: ignore
 from typing_extensions import Self
 
 
-# Custom transformer to mimic UnitRangeTransform
+# Custom transformer to mimic UnitRangeTransform from Julia
 class _UnitRangeTransform(BaseEstimator, TransformerMixin):
     def __init__(
         self,
@@ -52,49 +51,61 @@ class _UnitRangeTransform(BaseEstimator, TransformerMixin):
 
 
 def get_data(
+    point_clouds_processed_dir: Path,
     persistence_images_dir: Path,
 ) -> tuple[npt.NDArray, npt.NDArray]:
+    """Fetches data used for training and evaluating of SVMs.
+
+    Args:
+        point_clouds_processed_dir (Path): Directory containing the processed
+            point clouds.
+        persistence_images_dir (Path): Directory containing the concatenated
+            persistence images.
+
+    Returns:
+        tuple[npt.NDArray, npt.NDArray]: Tuple of two arrays, the first one
+            containing the concatenated persistence images corresponding to a
+            point cloud, and the second one the label encoding M1/M2-dominance.
+    """
     X_list: list[npt.NDArray] = []
     y_list: list[int] = []
-    for persistence_images_path in persistence_images_dir.iterdir():
+    for persistence_images_path in sorted(persistence_images_dir.iterdir()):
         persistence_images = np.load(persistence_images_path)
         persistence_images_concat = np.concatenate(persistence_images)
         X_list.append(persistence_images_concat)
         point_cloud_path = (
-            Path("outfiles/point_clouds_processed")
-            / persistence_images_path.name
+            point_clouds_processed_dir / persistence_images_path.name
         ).with_suffix(".npz")
         npz_file = np.load(point_cloud_path, allow_pickle=True)
-        _, _, point_cloud_label = [
-            npz_file[key]
-            for key in npz_file
-        ]
+        _, _, point_cloud_label = [npz_file[key] for key in npz_file]
         y_list.append(int(point_cloud_label))
     X, y = np.array(X_list), np.array(y_list)
     return X, y
 
 
 def _train_svm(
-        X: npt.NDArray,
-        y: npt.NDArray,
-        verbose: int,
-        random_state: Optional[int] = None,
-    ) -> tuple[float, float]:
+    X: npt.NDArray,
+    y: npt.NDArray,
+    n_jobs: int,
+    verbose: int,
+    rng: np.random.Generator,
+) -> tuple[float, float]:
     X_train, _, y_train, _ = train_test_split(
-        X, y, test_size=0.3, random_state=random_state
+        X, y, test_size=0.3, random_state=rng.integers(0, 1 << 32)
     )
     param_dist = {
         "svc__C": loguniform(1e-6, 1000.0),
         "svc__gamma": loguniform(1e-6, 1000.0),
     }
-    sm = SMOTE(random_state=random_state)
+    sm = SMOTE(random_state=rng.integers(0, 1 << 32))
     clf = SVC()
     svm_pipeline = Pipeline([("smote", sm), ("svc", clf)])
     random_search = RandomizedSearchCV(
         svm_pipeline,
         param_dist,
         n_iter=500,
-        random_state=random_state,
+        n_jobs=n_jobs,
+        random_state=rng.integers(0, 1 << 32),
         refit=True,
         verbose=verbose,
     )
@@ -110,22 +121,21 @@ def _repeat_svm(
     y: npt.NDArray,
     C: float,
     gamma: float,
-    n_repeats: int = 10,
-    random_state: Optional[int] = None,
+    n_repeats: int,
+    rng: np.random.Generator,
 ) -> npt.NDArray:
     accuracies = []
-    for _ in tqdm(
-        range(n_repeats),
-        desc="Fitting SVMs"
-    ):
-        rng = np.random.default_rng(random_state)
+    for _ in tqdm(range(n_repeats), desc="Fitting SVMs"):
         shuffled_ixs = rng.permutation(len(X))
-        X = X[shuffled_ixs]
-        y = y[shuffled_ixs]
+        X_shuffled = X[shuffled_ixs]
+        y_shuffled = y[shuffled_ixs]
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.3, random_state=random_state
+            X_shuffled,
+            y_shuffled,
+            test_size=0.3,
+            random_state=rng.integers(0, 1 << 32),
         )
-        sm = SMOTE(random_state=random_state)
+        sm = SMOTE(random_state=rng.integers(0, 1 << 32))
         clf = SVC(C=C, gamma=gamma)
         svm_pipeline = Pipeline([("smote", sm), ("svc", clf)])
         svm_pipeline.fit(X_train, y_train)
@@ -136,27 +146,57 @@ def _repeat_svm(
 
 
 def compute_SVM_accuracies(
-        X: npt.NDArray,
-        y: npt.NDArray,
-        complex: str,
-        verbose: int,
-        overwrite: bool = False,
-    ) -> npt.NDArray:
-    file_out = Path(f"outfiles/accuracies_{complex}.pkl")
+    X: npt.NDArray,
+    y: npt.NDArray,
+    complex: str,
+    n_repeats: int,
+    n_jobs: int,
+    verbose: int,
+    overwrite: bool,
+    random_state: Optional[int] = None
+) -> npt.NDArray:
+    """Optimizes hyperparameters of a SVM on a train portion of `X`, and then
+    trains and evaluates an SVM with the parameters found on a train and test
+    portion of `X` respectively. This latter portion is performed `n_repeats`
+    times using different splits.
+
+    Args:
+        X (npt.NDArray): Array containing concatenated persistence images.
+        y (npt.NDArray): Array containing label encoding M1/M2-dominance.
+        complex (str): Which complex to use. Must be one of `'dowker'` and
+            `'dowker_rips'`.
+        n_repeats (int): Number of times to repeat training and evaluating of
+            SVM with the optimal hyperparameters found.
+        n_jobs (int): Number of jobs to run in parllel during hyperparameter
+            tuning with `RandomizedSearchCV`.
+        verbose (int): Level of verbosity. The higher the value, the more
+            information is displayed.
+        overwrite (bool): Whether or not to overwrite existing files produced
+            in the process.
+        random_state (Optional[int], optional): A seed allowing for
+            reproducible results. Defaults to None.
+
+    Returns:
+        npt.NDArray: NumPy-array of shape `(n_repeats,)` containing the
+            accuracies of each SVM trained.
+    """
+    file_out = Path(f"outfiles/accuracies_{complex}_{n_repeats}_runs.npy")
     if not file_out.is_file() or overwrite:
+        rng = np.random.default_rng(random_state)
         scaler = _UnitRangeTransform(verbose=bool(verbose))
         X_scaled = scaler.fit_transform(X)
-        C, gamma = _train_svm(X_scaled, y, verbose)
-        accuracies = _repeat_svm(
-            X_scaled,
-            y,
-            C,
-            gamma,
-            10
+        C, gamma = _train_svm(
+            X=X_scaled, y=y, n_jobs=n_jobs, verbose=verbose, rng=rng
         )
-        with open(file_out, "wb") as f_out:
-            pickle.dump(accuracies, f_out)
+        accuracies = _repeat_svm(
+            X=X_scaled,
+            y=y,
+            C=C,
+            gamma=gamma,
+            n_repeats=n_repeats,
+            rng=rng
+        )
+        np.save(file_out, accuracies)
     else:
-        with open(file_out, "rb") as f_in:
-            accuracies = pickle.load(f_in)
+        accuracies = np.load(file_out)
     return accuracies
