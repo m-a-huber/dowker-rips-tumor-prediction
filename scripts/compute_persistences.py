@@ -9,10 +9,10 @@ from sklearn.base import clone  # type: ignore
 
 
 def compute_persistences(
-        complex: str,
-        point_cloud_file: Path,
-        overwrite: bool = False,
-    ) -> list[list[npt.NDArray[np.float64]]]:
+    complex: str,
+    point_cloud_file: Path,
+    overwrite: bool = False,
+) -> list[list[npt.NDArray[np.float64]]]:
     """Compute the required persistences from a processed point cloud and saves
     the output as a list containing the 0- and 1-dimensional homology of each
     label combination.
@@ -37,17 +37,13 @@ def compute_persistences(
             from consecutive homological dimensions.
     """
     file_out = (
-        Path(f"outfiles/{complex}_persistences")
-        / point_cloud_file.name
+        Path(f"outfiles/{complex}_persistences") / point_cloud_file.name
     ).with_suffix(".pkl")
     if not file_out.is_file() or overwrite:
         file_out.parent.mkdir(parents=True, exist_ok=True)
         persistences = []
         npz_file = np.load(point_cloud_file, allow_pickle=True)
-        cells, cells_labels, _ = [
-            npz_file[key]
-            for key in npz_file
-        ]
+        cells, cells_labels, _ = [npz_file[key] for key in npz_file]
         cell_label_combinations = [
             ("M", "V"),
             ("T", "V"),
@@ -70,9 +66,7 @@ def compute_persistences(
         for vertex_label, witness_label in cell_label_combinations:
             vertices = cells[cells_labels == vertex_label]
             witnesses = cells[cells_labels == witness_label]
-            persistence = clone(complex).fit_transform(
-                [vertices, witnesses]
-            )
+            persistence = clone(complex).fit_transform([vertices, witnesses])
             persistences.append(persistence)
         with open(file_out, "wb") as f_out:
             pickle.dump(persistences, f_out)

@@ -7,9 +7,7 @@ from gudhi.representations import PersistenceImage  # type: ignore
 
 
 def drop_infty(dim):
-    return dim[
-        ~np.isinf(dim).any(axis=1)
-    ]
+    return dim[~np.isinf(dim).any(axis=1)]
 
 
 def weight(pt):  # Default weight function used in `PersistenceDiagrams.jl`
@@ -17,10 +15,10 @@ def weight(pt):  # Default weight function used in `PersistenceDiagrams.jl`
 
 
 def compute_persistence_images(
-        complex: str,
-        persistences_file: Path,
-        overwrite: bool = False,
-    ) -> npt.NDArray[np.float64]:
+    complex: str,
+    persistences_file: Path,
+    overwrite: bool = False,
+) -> npt.NDArray[np.float64]:
     """Compute and concatenate the desired persistence images from the
     persistences and saves the output as a NumPy-array.
 
@@ -36,8 +34,7 @@ def compute_persistence_images(
             as the concatenation of the six flattened persistence images.
     """
     file_out = (
-        Path(f"outfiles/{complex}_persistence_images")
-        / persistences_file.name
+        Path(f"outfiles/{complex}_persistence_images") / persistences_file.name
     ).with_suffix(".npy")
     if not file_out.is_file() or overwrite:
         file_out.parent.mkdir(parents=True, exist_ok=True)

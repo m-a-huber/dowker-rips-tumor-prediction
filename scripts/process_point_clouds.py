@@ -1,17 +1,14 @@
-import sys
 from pathlib import Path
 
-import h5py  # type: ignore
 import numpy as np
 import numpy.typing as npt  # type: ignore
 import pandas as pd  # type: ignore
-from tqdm import tqdm  # type: ignore
 
 
 def process_point_cloud(
-        point_cloud_file: Path,
-        overwrite: bool = False,
-    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.str_], int]:
+    point_cloud_file: Path,
+    overwrite: bool = False,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.str_], int]:
     """Processes file containing point cloud and produces and saves the output
     in two NumPy-arrays that contain the xy-coordinates and the labels of the
     cells, respectively, as well as an `int` representing the M1/M2-dominance
@@ -33,8 +30,7 @@ def process_point_cloud(
             where `0` and `1` correspond to M1- and M2-dominance, respectively.
     """
     file_out = (
-        Path("outfiles/point_clouds_processed")
-        / point_cloud_file.name
+        Path("outfiles/point_clouds_processed") / point_cloud_file.name
     ).with_suffix(".npz")
     if not file_out.is_file() or overwrite:
         file_out.parent.mkdir(parents=True, exist_ok=True)
@@ -50,53 +46,13 @@ def process_point_cloud(
         point_cloud_label = int(n > 0 and M1_count / n < 0.5)
         np.savez(
             file_out,
-            *[
-                cells,
-                cells_labels,
-                point_cloud_label,
-            ],
+            cells=cells,
+            cells_labels=cells_labels,
+            point_cloud_label=point_cloud_label,
         )
     else:
         npz_file = np.load(file_out, allow_pickle=True)
-        cells, cells_labels, point_cloud_label = [
-            npz_file[key]
-            for key in npz_file
-        ]
+        cells = npz_file["cells"]
+        cells_labels = npz_file["cells_labels"]
+        point_cloud_label = npz_file["point_cloud_label"]
     return cells, cells_labels, point_cloud_label
-
-
-if __name__ == "__main__":
-    # Get ids and times of files used in experiment
-    with h5py.File("data/sim_ids_and_times.jld2", "r") as f:
-        sims = f["sims"][:]
-        dereferenced_sims = [
-            f[ref][:]
-            for ref in sims
-        ]
-    ids_and_times = np.array(dereferenced_sims)
-    # Get files containing point clouds used in experiment
-    point_clouds_path = Path("data/point_clouds")
-    point_cloud_files = [
-        (
-            point_clouds_path
-            / f"ID-{id}_time-{time}_From2ParamSweep_Data.csv"
-        )
-        for id, time in ids_and_times
-    ]
-    overwrite, verbose = sys.argv[1] == "True", sys.argv[2] == "True"
-    for point_cloud_file in tqdm(
-        point_cloud_files,
-        desc="Processing point clouds",
-    ):
-        try:
-            process_point_cloud(
-                point_cloud_file,
-                overwrite=overwrite,
-            )
-            if verbose:
-                tqdm.write(
-                    f"Processed point cloud data at `{point_cloud_file}`."
-                )
-        except FileNotFoundError:
-            if verbose:
-                tqdm.write(f"File {point_cloud_file} not found, skipping.")
