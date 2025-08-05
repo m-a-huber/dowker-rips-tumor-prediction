@@ -55,6 +55,7 @@ def compute_persistences(
             )
         elif complex == "dowker_rips":
             complex = DowkerRipsComplex(
+                use_numpy=True,
                 n_threads=-1,
                 swap=True,
             )
