@@ -121,6 +121,10 @@ if __name__ == "__main__":
         print(f"Accuracies are: {accuracies}")
         print(
             f"Average accuracy across {n_repeats} runs is: "
-            f"{np.around(np.mean(accuracies), 4)}"
-            f"\u00b1{np.around(np.std(accuracies), 4)}"
+            f"{np.around(np.mean(accuracies), 2)}"
+            f"\u00b1{np.around(np.std(accuracies), 2)}."
+        )
+        print(
+            f"Median accuracy across {n_repeats} runs is: "
+            f"{np.around(np.median(accuracies), 2)}."
         )
