@@ -1,5 +1,5 @@
 [project]
-name = "multiplex-relations-reproduction"
+name = "dowker-rips-tumor-prediction"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -16,5 +16,5 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-dowker-complex = { path = "../dowker_complex", editable = true }
-dowker-rips-complex = { path = "../dowker_rips_complex", editable = true }
+dowker-complex = { path = "../dowker-complex", editable = true }
+dowker-rips-complex = { path = "../dowker-rips-complex", editable = true }
