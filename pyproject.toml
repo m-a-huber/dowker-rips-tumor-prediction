@@ -1,29 +1,20 @@
 [project]
-name = "multiplex-relations"
+name = "multiplex-relations-reproduction"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "dowker-complex",
     "dowker-rips-complex",
-    "h5py>=3.13.0",
+    "h5py>=3.14.0",
     "imblearn>=0.0",
-    "numpy>=2.1.3",
-    "pandas>=2.2.3",
-    "scikit-learn>=1.6.1",
+    "numpy>=2.2.6",
+    "pandas>=2.3.1",
+    "scikit-learn==1.6.1",
     "tqdm>=4.67.1",
 ]
 
 [tool.uv.sources]
-myplot = { path = "../myplot", editable = true }
 dowker-complex = { path = "../dowker_complex", editable = true }
 dowker-rips-complex = { path = "../dowker_rips_complex", editable = true }
-
-[dependency-groups]
-dev = [
-    "jupyter>=1.1.1",
-    "matplotlib>=3.10.1",
-    "myplot",
-    "seaborn>=0.13.2",
-]
