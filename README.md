@@ -4,7 +4,7 @@ This repository contains code to recreate the microenvironment classification re
 
 __Requirements__
 
-Required dependencies are specified in `pyproject.toml`. The dependencies `dowker-complex` and `dowker-rips-complex` can be installed from source from [here](https://github.com/m-a-huber/dowker-complex) and [here](https://github.com/m-a-huber/dowker-rips-complex).
+Required dependencies are specified in `pyproject.toml`. The dependencies `dowker-complex` and `dowker-rips-complex` can be installed from source from [here](https://github.com/m-a-huber/dowker-complex) and [here](https://github.com/m-a-huber/dowker-rips-complex), respectively.
 
 ---
 
