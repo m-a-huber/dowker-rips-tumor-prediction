@@ -1,4 +1,4 @@
-This repository contains code to recreate the microenvironment classification results from the paper [<em>Flagifying the Dowker Complex</em>](TODO).
+This repository contains code to recreate the microenvironment classification results from the paper [<em>Flagifying the Dowker Complex</em>](https://arxiv.org/abs/2508.08025).
 
 ---
 
