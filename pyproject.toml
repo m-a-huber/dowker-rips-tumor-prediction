@@ -5,16 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "dowker-complex",
-    "dowker-rips-complex",
+    "dowker-complex>=0.1.2",
+    "dowker-rips-complex>=0.1.0",
     "h5py>=3.14.0",
-    "imblearn>=0.0",
+    "imbalanced-learn>=0.14.0",
     "numpy>=2.2.6",
     "pandas>=2.3.1",
-    "scikit-learn==1.6.1",
+    "scikit-learn>=1.7.1",
     "tqdm>=4.67.1",
 ]
-
-[tool.uv.sources]
-dowker-complex = { path = "../dowker-complex", editable = true }
-dowker-rips-complex = { path = "../dowker-rips-complex", editable = true }
