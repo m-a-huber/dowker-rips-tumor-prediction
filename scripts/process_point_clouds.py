@@ -1,8 +1,8 @@
 from pathlib import Path
 
 import numpy as np
-import numpy.typing as npt  # type: ignore
-import pandas as pd  # type: ignore
+import numpy.typing as npt
+import pandas as pd
 
 
 def process_point_cloud(

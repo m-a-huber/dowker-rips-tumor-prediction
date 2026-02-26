@@ -2,10 +2,10 @@ import pickle
 from pathlib import Path
 
 import numpy as np
-import numpy.typing as npt  # type: ignore
-from dowker_complex import DowkerComplex  # type: ignore
-from dowker_rips_complex import DowkerRipsComplex  # type: ignore
-from sklearn.base import clone  # type: ignore
+import numpy.typing as npt
+from dowker_complex import DowkerComplex
+from dowker_rips_complex import DowkerRipsComplex
+from sklearn.base import clone
 
 
 def compute_persistences(
@@ -50,11 +50,11 @@ def compute_persistences(
             ("M", "T"),
         ]
         if complex == "dowker":
-            complex = DowkerComplex(
+            estimator = DowkerComplex(
                 swap=True,
             )
         elif complex == "dowker_rips":
-            complex = DowkerRipsComplex(
+            estimator = DowkerRipsComplex(
                 use_numpy=True,
                 n_threads=-1,
                 swap=True,
@@ -67,7 +67,7 @@ def compute_persistences(
         for vertex_label, witness_label in cell_label_combinations:
             vertices = cells[cells_labels == vertex_label]
             witnesses = cells[cells_labels == witness_label]
-            persistence = clone(complex).fit_transform([vertices, witnesses])
+            persistence = clone(estimator).fit_transform([vertices, witnesses])
             persistences.append(persistence)
         with open(file_out, "wb") as f_out:
             pickle.dump(persistences, f_out)

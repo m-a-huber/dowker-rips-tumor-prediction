@@ -2,17 +2,17 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-import numpy.typing as npt  # type: ignore
-from imblearn.over_sampling import SMOTE  # type: ignore
-from imblearn.pipeline import Pipeline  # type: ignore
-from scipy.stats import loguniform  # type: ignore
-from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
-from sklearn.model_selection import (  # type: ignore
+import numpy.typing as npt
+from imblearn.over_sampling import SMOTE
+from imblearn.pipeline import Pipeline
+from scipy.stats import loguniform
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.model_selection import (
     RandomizedSearchCV,
     train_test_split,
 )
-from sklearn.svm import SVC  # type: ignore
-from tqdm import tqdm  # type: ignore
+from sklearn.svm import SVC
+from tqdm import tqdm
 from typing_extensions import Self
 
 
@@ -27,7 +27,7 @@ class _UnitRangeTransform(BaseEstimator, TransformerMixin):
     def fit(
         self,
         X: npt.NDArray,
-        y: Optional[None] = None,
+        y: Optional[None] = None,  # noqa: ARG002
     ) -> Self:
         if self.verbose:
             print("Fitting _UnitRangeTransform...")
@@ -40,7 +40,7 @@ class _UnitRangeTransform(BaseEstimator, TransformerMixin):
     def transform(
         self,
         X: npt.NDArray,
-        y: Optional[None] = None,
+        y: Optional[None] = None,  # noqa: ARG002
     ):
         if self.verbose:
             print("Transforming data using _UnitRangeTransform...")
@@ -153,7 +153,7 @@ def compute_SVM_accuracies(
     n_jobs: int,
     verbose: int,
     overwrite: bool,
-    random_state: Optional[int] = None
+    random_state: Optional[int] = None,
 ) -> npt.NDArray:
     """Optimizes hyperparameters of a SVM on a train portion of `X`, and then
     trains and evaluates an SVM with the parameters found on a train and test
@@ -186,7 +186,11 @@ def compute_SVM_accuracies(
         scaler = _UnitRangeTransform(verbose=bool(verbose))
         X_scaled = scaler.fit_transform(X)
         C, gamma = _train_svm(
-            X=X_scaled, y=y, n_jobs=n_jobs, verbose=verbose, rng=rng
+            X=X_scaled,
+            y=y,
+            n_jobs=n_jobs,
+            verbose=verbose,
+            rng=rng,
         )
         accuracies = _repeat_svm(
             X=X_scaled,
@@ -194,7 +198,7 @@ def compute_SVM_accuracies(
             C=C,
             gamma=gamma,
             n_repeats=n_repeats,
-            rng=rng
+            rng=rng,
         )
         np.save(file_out, accuracies)
     else:

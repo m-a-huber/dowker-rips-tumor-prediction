@@ -1,9 +1,9 @@
 import sys
 from pathlib import Path
 
-import h5py  # type: ignore
+import h5py
 import numpy as np
-from tqdm import tqdm  # type: ignore
+from tqdm import tqdm
 
 from scripts.compute_persistence_images import (
     compute_persistence_images,

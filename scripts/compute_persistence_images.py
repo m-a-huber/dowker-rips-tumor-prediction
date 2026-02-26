@@ -2,8 +2,8 @@ import pickle
 from pathlib import Path
 
 import numpy as np
-import numpy.typing as npt  # type: ignore
-from gudhi.representations import PersistenceImage  # type: ignore
+import numpy.typing as npt
+from gudhi.representations import PersistenceImage
 
 
 def drop_infty(dim):
