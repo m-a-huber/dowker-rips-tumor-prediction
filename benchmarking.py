@@ -3,16 +3,19 @@ import time
 from pathlib import Path
 
 import numpy as np
+import plotly.graph_objects as go
 import polars as pl
 from dowker_complex import DowkerComplex
 from dowker_rips_complex import DowkerRipsComplex
-from dowker_rips_complex_gudhi import DowkerRipsComplexGudhi
 from sklearn.base import clone
 from sklearn.model_selection import train_test_split
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
-N_POINTS_VALUES = [2 ** (i + 1) for i in range(10)]  # [2, 4, ..., 1024]
-DIM_VALUES = [2 ** (i + 1) for i in range(10)]  # [2, 4, ..., 1024]
+from scripts import cs_wong
+from scripts.dowker_rips_complex_gudhi import DowkerRipsComplexGudhi
+
+N_POINTS_VALUES = [2 ** (i + 1) for i in range(11)]  # [2, 4, ..., 2048]
+DIM_VALUES = [2 ** (i + 1) for i in range(11)]  # [2, 4, ..., 2048]
 N_POINTS_BASE = 512
 DIM_BASE = 512
 RATIO_VERTICES = 0.5
@@ -93,12 +96,68 @@ def time_fit_transform(
     warmup_dataset = [arr.copy() for arr in dataset]
     clone(estimator).fit_transform(warmup_dataset)
     elapsed_times = []
-    for _ in range(n_repeats):
+    for _ in trange(
+        n_repeats, desc="Iterating over repeats", leave=False, position=3
+    ):
         dataset_copied = [arr.copy() for arr in dataset]
         start = time.perf_counter()
         clone(estimator).fit_transform(dataset_copied)
         elapsed_times.append(time.perf_counter() - start)
     return np.asarray(elapsed_times)
+
+
+def save_runtime_plot(df: pl.DataFrame, vary: str, plotfile: Path) -> None:
+    x_col = "n_points" if vary == "size" else "dim"
+    x_title = "Point cloud size" if vary == "size" else "Point cloud dimension"
+    x_values = sorted(df[x_col].unique().to_list())
+    config_order_df = (
+        df.group_by("config")
+        .agg(pl.col("time_mean").mean().alias("avg_time_mean"))
+        .sort("avg_time_mean", descending=True)
+    )
+    configs = config_order_df["config"].to_list()
+    color_maps = [f"rgb{rgb}" for rgb in cs_wong.rgbs]
+    shapes = ["circle", "square", "diamond", "x"]
+    fig = go.Figure()
+    for i, config in enumerate(configs):
+        df_config = df.filter(pl.col("config") == config).sort(x_col)
+        fig.add_trace(
+            go.Scatter(
+                x=df_config[x_col].to_list(),
+                y=df_config["time_mean"].to_list(),
+                error_y={
+                    "type": "data",
+                    "array": df_config["time_std"].to_list(),
+                    "visible": True,
+                },
+                mode="lines+markers",
+                line={"color": color_maps[i]},
+                marker={"color": color_maps[i], "symbol": shapes[i]},
+                name=config,
+            )
+        )
+    fig.update_layout(
+        title="log-log plot of average runtimes",
+        xaxis={
+            "title": f"{x_title}",
+            "type": "log",
+            "tickmode": "array",
+            "tickvals": x_values,
+            "ticktext": [str(value) for value in x_values],
+        },
+        yaxis={
+            "title": "Runtime (seconds)",
+            "type": "log",
+        },
+        legend_title="Configuration",
+        template="plotly_white",
+    )
+    try:
+        fig.write_image(str(plotfile), format="pdf")
+    except ValueError as err:
+        raise RuntimeError(
+            "Could not export plot to PDF. Install kaleido and rerun."
+        ) from err
 
 
 def main(
@@ -117,6 +176,7 @@ def main(
     outfile = Path(
         f"benchmarking_results/benchmarking_results_vary_{vary}_{n_datasets}_datasets_{n_repeats}_repeats_seed_{seed}.csv"
     )
+    plotfile = outfile.with_suffix(".pdf")
     if outfile.exists() and not overwrite:
         df = pl.read_csv(outfile)
         if verbose:
@@ -171,7 +231,7 @@ def main(
             benchmark_inputs = [(n_points_base, dim) for dim in dim_values]
             desc = "Running Dowker-Rips benchmarking (varying dimension)"
         order_rng = np.random.default_rng(seed)
-        for n_points, dim in tqdm(benchmark_inputs, desc=desc):
+        for n_points, dim in tqdm(benchmark_inputs, desc=desc, position=0):
             if verbose:
                 tqdm.write(
                     f"Running benchmarking for n_points={n_points}, "
@@ -192,11 +252,21 @@ def main(
             dataset_means_by_config: dict[str, list[float]] = {
                 label: [] for label, _ in configs
             }
-            for dataset in datasets:
+            for dataset in tqdm(
+                datasets,
+                desc="Iterating over datasets",
+                leave=False,
+                position=1,
+            ):
                 ordered_configs = [
                     configs[i] for i in order_rng.permutation(len(configs))
                 ]
-                for label, estimator in ordered_configs:
+                for label, estimator in tqdm(
+                    ordered_configs,
+                    desc="Iterating over configs",
+                    leave=False,
+                    position=2,
+                ):
                     elapsed_times = time_fit_transform(
                         estimator=estimator,
                         dataset=dataset,
@@ -236,6 +306,9 @@ def main(
         df.write_csv(outfile)
         if verbose:
             tqdm.write(f"Saved benchmarking results to {outfile}.")
+    save_runtime_plot(df, vary=vary, plotfile=plotfile)
+    if verbose:
+        tqdm.write(f"Saved runtime plot to {plotfile}.")
     if verbose:
         tqdm.write("Benchmarking results:")
         tqdm.write(str(df))
