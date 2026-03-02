@@ -11,16 +11,16 @@ The dependencies `dowker-complex` and `dowker-rips-complex` can be installed eit
 
 __Reproducing results__
 
-To reproduce the results, run the command `python main.py <complex> [options]`, where
+To reproduce the results, run the command `python experiment.py <complex> [options]`, where
 - `<complex>` must be one of `dowker_rips` and `dowker`, and indicates whether to use the Dowker or the Dowker-Rips complex;
 - `--n-repeats <int>` indicates the number of times training of the SVM is repeated (default: 10);
 - `--n-jobs` indicates the number of jobs to run in parallel in hyperparameter tuning (default: 1);
 - `--overwrite` indicates whether results existing on disk should be overwritten or not; and
 - `--verbose` increases the level of verbosity during execution of the script.
 
-For example, to reproduce the results of the paper using the Dowker-Rips complex with verbose output, run `python main.py dowker_rips --n-repeats 10 --verbose 1`
+For example, to reproduce the results of the paper using the Dowker-Rips complex with verbose output, run `python experiment.py dowker_rips --n-repeats 10 --verbose 1`
 
-Executing `main.py` as above will create a directory named `outfiles` that contains the processed point cloud files, the persistence data, the persistence images as well as an array containing the accuracies of each of the `--n-repeats` many SVMs trained and evaluated in the process.
+Executing `experiment.py` as above will create a directory named `outfiles` that contains the processed point cloud files, the persistence data, the persistence images as well as an array containing the accuracies of each of the `--n-repeats` many SVMs trained and evaluated in the process.
 
 ---
 
@@ -29,4 +29,4 @@ __For users of `uv`__
 If `uv` is installed, the dependencies `dowker-complex` and `dowker-rips-complex` can be installed by running e.g. `uv add dowker-complex` and `uv add dowker-rips-complex`, respectively.
 The required dependencies and the environment specified in `uv.lock` can be recreated by running `uv sync`.
 
-To reproduce the results from the paper, run `uv run main.py <complex> [options]`, with options specified as above.
+To reproduce the results from the paper, run `uv run experiment.py <complex> [options]`, with options specified as above.
