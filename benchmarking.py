@@ -73,7 +73,7 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def generate_datasets(
+def generate_dataset(
     n_points: int,
     dim: int,
     ratio_vertices: float,
@@ -106,38 +106,78 @@ def time_fit_transform(
     return np.asarray(elapsed_times)
 
 
-def save_runtime_plot(df: pl.DataFrame, vary: str, plotfile: Path) -> None:
+def make_plot(
+    df: pl.DataFrame,
+    vary: str,
+) -> go.Figure:
     x_col = "n_points" if vary == "size" else "dim"
     x_title = "Point cloud size" if vary == "size" else "Point cloud dimension"
     x_values = sorted(df[x_col].unique().to_list())
-    config_order_df = (
+    configs = (  # order configs by average runtime
         df.group_by("config")
         .agg(pl.col("time_mean").mean().alias("avg_time_mean"))
         .sort("avg_time_mean", descending=True)
-    )
-    configs = config_order_df["config"].to_list()
-    color_maps = [f"rgb{rgb}" for rgb in cs_wong.rgbs]
+    )["config"].to_list()
+    rgbs_wong = [f"rgb{rgb}" for rgb in cs_wong.rgbs]
+
+    def rgbas_wong(alpha: float) -> list[str]:
+        return [f"rgba{(*rgb, alpha)}" for rgb in cs_wong.rgbs]
+
     shapes = ["circle", "square", "diamond", "x"]
     fig = go.Figure()
     for i, config in enumerate(configs):
         df_config = df.filter(pl.col("config") == config).sort(x_col)
+        y_values = df_config["time_mean"].to_list()
+        dataset_mean_stds = df_config["dataset_mean_std"].to_list()
+        y_upper = [
+            y_value + dataset_mean_std
+            for y_value, dataset_mean_std in zip(y_values, dataset_mean_stds)
+        ]
+        y_lower = [
+            y_value - dataset_mean_std
+            # max(1e-12, y_value - dataset_mean_std)
+            for y_value, dataset_mean_std in zip(y_values, dataset_mean_stds)
+        ]
+        x_data = df_config[x_col].to_list()
+        # Draw std-dev band
         fig.add_trace(
             go.Scatter(
-                x=df_config[x_col].to_list(),
-                y=df_config["time_mean"].to_list(),
-                error_y={
-                    "type": "data",
-                    "array": df_config["time_std"].to_list(),
-                    "visible": True,
-                },
+                x=x_data,
+                y=y_lower,
+                mode="lines",
+                line={"width": 0},
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=x_data,
+                y=y_upper,
+                mode="lines",
+                line={"width": 0},
+                fill="tonexty",
+                fillcolor=rgbas_wong(alpha=0.2)[i],
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
+        # Draw mean line
+        fig.add_trace(
+            go.Scatter(
+                x=x_data,
+                y=y_values,
                 mode="lines+markers",
-                line={"color": color_maps[i]},
-                marker={"color": color_maps[i], "symbol": shapes[i]},
+                line={"color": rgbs_wong[i]},
+                marker={
+                    "color": rgbs_wong[i],
+                    "symbol": shapes[i],
+                },
                 name=config,
             )
         )
     fig.update_layout(
-        title="log-log plot of average runtimes",
+        title="Log-log plot of mean runtimes with std. dev. across datasets",
         xaxis={
             "title": f"{x_title}",
             "type": "log",
@@ -148,16 +188,16 @@ def save_runtime_plot(df: pl.DataFrame, vary: str, plotfile: Path) -> None:
         yaxis={
             "title": "Runtime (seconds)",
             "type": "log",
+            "tickmode": "linear",
+            "tick0": 0,
+            "dtick": 1,
+            "exponentformat": "power",
+            "showexponent": "all",
         },
-        legend_title="Configuration",
+        legend_title="Algorithm configuration",
         template="plotly_white",
     )
-    try:
-        fig.write_image(str(plotfile), format="pdf")
-    except ValueError as err:
-        raise RuntimeError(
-            "Could not export plot to PDF. Install kaleido and rerun."
-        ) from err
+    return fig
 
 
 def main(
@@ -176,7 +216,6 @@ def main(
     outfile = Path(
         f"benchmarking_results/benchmarking_results_vary_{vary}_{n_datasets}_datasets_{n_repeats}_repeats_seed_{seed}.csv"
     )
-    plotfile = outfile.with_suffix(".pdf")
     if outfile.exists() and not overwrite:
         df = pl.read_csv(outfile)
         if verbose:
@@ -231,6 +270,7 @@ def main(
             benchmark_inputs = [(n_points_base, dim) for dim in dim_values]
             desc = "Running Dowker-Rips benchmarking (varying dimension)"
         order_rng = np.random.default_rng(seed)
+        # Iterate over benchmark inputs (n_points, dim)
         for n_points, dim in tqdm(benchmark_inputs, desc=desc, position=0):
             if verbose:
                 tqdm.write(
@@ -238,7 +278,7 @@ def main(
                     f"dim={dim}..."
                 )
             datasets = [
-                generate_datasets(
+                generate_dataset(
                     n_points=n_points,
                     dim=dim,
                     ratio_vertices=ratio_vertices,
@@ -246,27 +286,32 @@ def main(
                 )
                 for i in range(n_datasets)
             ]
+            # Initialize dicts for elapsed times and dataset means by config
             elapsed_times_by_config: dict[str, list[np.ndarray]] = {
                 label: [] for label, _ in configs
             }
             dataset_means_by_config: dict[str, list[float]] = {
                 label: [] for label, _ in configs
             }
+            # Iterate over datasets
             for dataset in tqdm(
                 datasets,
                 desc="Iterating over datasets",
                 leave=False,
                 position=1,
             ):
-                ordered_configs = [
+                # Shuffle configs
+                configs_shuffled = [
                     configs[i] for i in order_rng.permutation(len(configs))
                 ]
+                # Iterate over configs
                 for label, estimator in tqdm(
-                    ordered_configs,
+                    configs_shuffled,
                     desc="Iterating over configs",
                     leave=False,
                     position=2,
                 ):
+                    # Time fit_transform
                     elapsed_times = time_fit_transform(
                         estimator=estimator,
                         dataset=dataset,
@@ -306,12 +351,17 @@ def main(
         df.write_csv(outfile)
         if verbose:
             tqdm.write(f"Saved benchmarking results to {outfile}.")
-    save_runtime_plot(df, vary=vary, plotfile=plotfile)
+    fig = make_plot(
+        df,
+        vary=vary,
+    )
+    plotfile_pdf = outfile.with_suffix(".pdf")
+    plotfile_svg = outfile.with_suffix(".svg")
+    fig.write_image(plotfile_pdf)
+    fig.write_image(plotfile_svg)
     if verbose:
-        tqdm.write(f"Saved runtime plot to {plotfile}.")
-    if verbose:
-        tqdm.write("Benchmarking results:")
-        tqdm.write(str(df))
+        tqdm.write(f"Saved PDF of runtime plot to {plotfile_pdf}.")
+        tqdm.write(f"Saved SVG of runtime plot to {plotfile_svg}.")
 
 
 if __name__ == "__main__":
