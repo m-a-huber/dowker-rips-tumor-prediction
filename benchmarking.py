@@ -14,8 +14,6 @@ from tqdm import tqdm, trange
 from scripts import cs_wong
 from scripts.dowker_rips_complex_gudhi import DowkerRipsComplexGudhi
 
-N_POINTS_VALUES = [2 ** (i + 1) for i in range(11)]  # [2, 4, ..., 2048]
-DIM_VALUES = [2 ** (i + 1) for i in range(11)]  # [2, 4, ..., 2048]
 N_POINTS_BASE = 512
 DIM_BASE = 512
 RATIO_VERTICES = 0.5
@@ -34,10 +32,13 @@ def parse_args() -> argparse.Namespace:
         help="Whether to vary the size or the dimension of the point cloud",
     )
     parser.add_argument(
-        "--seed",
+        "--max-exponent",
         type=int,
-        default=42,
-        help="Seed for random number generator",
+        default=11,
+        help=(
+            "Maximum exponent for the range of point cloud size and dimension "
+            "values to benchmark"
+        ),
     )
     parser.add_argument(
         "--n-datasets",
@@ -58,6 +59,12 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Seed for random number generator",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
     )
@@ -66,6 +73,8 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
     )
     args = parser.parse_args()
+    if args.max_exponent <= 0:
+        raise ValueError("Maximum exponent must be positive")
     if args.n_datasets <= 0:
         raise ValueError("Number of datasets must be positive")
     if args.n_repeats <= 0:
@@ -116,7 +125,7 @@ def make_plot(
     configs = (  # order configs by average runtime
         df.group_by("config")
         .agg(pl.col("time_mean").mean().alias("avg_time_mean"))
-        .sort("avg_time_mean", descending=True)
+        .sort("avg_time_mean", descending=False)
     )["config"].to_list()
     rgbs_wong = [f"rgb{rgb}" for rgb in cs_wong.rgbs]
 
@@ -195,6 +204,14 @@ def make_plot(
             "showexponent": "all",
         },
         legend_title="Algorithm configuration",
+        legend={
+            "orientation": "v",
+            "yanchor": "top",
+            "y": -0.2,
+            "xanchor": "center",
+            "x": 0.5,
+        },
+        margin={"b": 140},
         template="plotly_white",
     )
     return fig
@@ -202,19 +219,23 @@ def make_plot(
 
 def main(
     vary: str,
-    n_points_values: list[int],
-    dim_values: list[int],
+    max_exponent: int,
+    n_datasets: int,
+    n_repeats: int,
     n_points_base: int,
     dim_base: int,
     ratio_vertices: float,
     seed: int,
-    n_datasets: int,
-    n_repeats: int,
     verbose: bool,
     overwrite: bool,
 ) -> None:
     outfile = Path(
-        f"benchmarking_results/benchmarking_results_vary_{vary}_{n_datasets}_datasets_{n_repeats}_repeats_seed_{seed}.csv"
+        f"benchmarking_results/benchmarking_results"
+        f"_max_exponent_{max_exponent}"
+        f"_vary_{vary}"
+        f"_n_datasets_{n_datasets}"
+        f"_n_repeats_{n_repeats}"
+        f"_seed_{seed}.csv"
     )
     if outfile.exists() and not overwrite:
         df = pl.read_csv(outfile)
@@ -223,6 +244,8 @@ def main(
                 f"Found benchmarking results at {outfile}; not overwriting."
             )
     else:
+        n_points_values = [2 ** (i + 1) for i in range(max_exponent)]
+        dim_values = [2 ** (i + 1) for i in range(max_exponent)]
         configs: list[
             tuple[
                 str, DowkerComplex | DowkerRipsComplex | DowkerRipsComplexGudhi
@@ -351,31 +374,39 @@ def main(
         df.write_csv(outfile)
         if verbose:
             tqdm.write(f"Saved benchmarking results to {outfile}.")
-    fig = make_plot(
-        df,
-        vary=vary,
-    )
     plotfile_pdf = outfile.with_suffix(".pdf")
     plotfile_svg = outfile.with_suffix(".svg")
-    fig.write_image(plotfile_pdf)
-    fig.write_image(plotfile_svg)
-    if verbose:
-        tqdm.write(f"Saved PDF of runtime plot to {plotfile_pdf}.")
-        tqdm.write(f"Saved SVG of runtime plot to {plotfile_svg}.")
+    if plotfile_pdf.exists() and plotfile_svg.exists() and not overwrite:
+        if verbose:
+            tqdm.write(
+                f"Found PDF- and SVG-plots at {plotfile_pdf} and "
+                f"{plotfile_svg}, respectively; not overwriting."
+            )
+    else:
+        fig = make_plot(
+            df,
+            vary=vary,
+        )
+        fig.write_image(plotfile_pdf)
+        fig.write_image(plotfile_svg)
+        if verbose:
+            tqdm.write(
+                f"Saved PDF- and SVG-plots to {plotfile_pdf} and "
+                f"{plotfile_svg}, respectively."
+            )
 
 
 if __name__ == "__main__":
     args = parse_args()
     main(
         vary=args.vary,
-        n_points_values=N_POINTS_VALUES,
-        dim_values=DIM_VALUES,
+        max_exponent=args.max_exponent,
+        n_datasets=args.n_datasets,
+        n_repeats=args.n_repeats,
         n_points_base=N_POINTS_BASE,
         dim_base=DIM_BASE,
         ratio_vertices=RATIO_VERTICES,
         seed=args.seed,
-        n_datasets=args.n_datasets,
-        n_repeats=args.n_repeats,
         verbose=args.verbose,
         overwrite=args.overwrite,
     )
