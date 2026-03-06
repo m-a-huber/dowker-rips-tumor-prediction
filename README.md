@@ -2,31 +2,86 @@ This repository contains code to recreate the microenvironment classification re
 
 ---
 
-__Requirements__
+## Requirements
 
-Required dependencies are specified in `pyproject.toml`.
-The dependencies `dowker-complex` and `dowker-rips-complex` can be installed either from source from [here](https://github.com/m-a-huber/dowker-complex) and [here](https://github.com/m-a-huber/dowker-rips-complex), respectively, or via `pip` by running e.g. `pip install -U dowker-complex` and `pip install -U dowker-rips-complex`, respectively.
+- Python `>=3.10`
+- Dependencies in `pyproject.toml`
+- Data in `data/` (included in this repository)
 
----
+The environment specified in `uv.lock` can be recreated by running
 
-__Reproducing results__
-
-To reproduce the results, run the command `python experiment.py <complex> [options]`, where
-- `<complex>` must be one of `dowker_rips` and `dowker`, and indicates whether to use the Dowker or the Dowker-Rips complex;
-- `--n-repeats <int>` indicates the number of times training of the SVM is repeated (default: 10);
-- `--n-jobs` indicates the number of jobs to run in parallel in hyperparameter tuning (default: 1);
-- `--overwrite` indicates whether results existing on disk should be overwritten or not; and
-- `--verbose` increases the level of verbosity during execution of the script.
-
-For example, to reproduce the results of the paper using the Dowker-Rips complex with verbose output, run `python experiment.py dowker_rips --n-repeats 10 --verbose 1`
-
-Executing `experiment.py` as above will create a directory named `outfiles` that contains the processed point cloud files, the persistence data, the persistence images as well as an array containing the accuracies of each of the `--n-repeats` many SVMs trained and evaluated in the process.
+```bash
+uv sync
+```
 
 ---
 
-__For users of `uv`__
+## Reproducing classification results
 
-If `uv` is installed, the dependencies `dowker-complex` and `dowker-rips-complex` can be installed by running e.g. `uv add dowker-complex` and `uv add dowker-rips-complex`, respectively.
-The required dependencies and the environment specified in `uv.lock` can be recreated by running `uv sync`.
+To reproduce the results of the tumor microenvironment classification pipeline, run
 
-To reproduce the results from the paper, run `uv run experiment.py <complex> [options]`, with options specified as above.
+```bash
+uv run experiment.py <complex> [options]
+```
+
+where
+
+- `<complex>` is one of `dowker` or `dowker_rips`;
+- `--n-repeats <int>` is the number of repeated SVM evaluations (default:
+  `10`);
+- `--n-jobs <int>` is the number of jobs used for hyperparameter tuning
+  (default: `1`);
+- `--overwrite` overwrites existing outputs; and
+- `--verbose <int>` sets verbosity (default: `0`; values `>=1` print progress).
+
+As an example, to reproduce the results from the paper setting using the Dowker-Rips complex run
+
+```bash
+uv run experiment.py dowker_rips --verbose 1
+```
+
+This creates/updates `outfiles/` with
+
+- processed point clouds (`outfiles/point_clouds_processed/`);
+- persistence files (`outfiles/<complex>_persistences/`);
+- persistence images (`outfiles/<complex>_persistence_images/`); and
+- SVM accuracy arrays/statistics written by the experiment pipeline.
+
+---
+
+## Recreating benchmarking results
+
+To reproduce the benchmarking results, run
+
+```bash
+uv run benchmarking.py --vary <size|dim> [options]
+```
+
+with options:
+
+- `--vary <size|dim>`: vary point-cloud size or ambient dimension (required);
+- `--max-exponent <int>`: number of powers of two tested (default: `11`);
+- `--n-datasets <int>`: independently generated datasets per setting (default:
+  `10`);
+- `--n-repeats <int>`: repeated timings per dataset/configuration (default:
+  `5`);
+- `--seed <int>`: random seed (default: `42`);
+- `--verbose`: print progress; and
+- `--overwrite`: overwrite existing CSVs/plots.
+
+As an example, to reproduce the benchmarking results from the paper run
+
+```bash
+uv run benchmarking.py --vary size --verbose
+```
+
+and
+
+```bash
+uv run benchmarking.py --vary dim --verbose
+```
+
+This creates/updates `benchmarking_results/` with
+
+- CSV results (`benchmarking_results/benchmarking_results_*.csv`); and
+- plots (`benchmarking_results/benchmarking_results_*.pdf` and `benchmarking_results/benchmarking_results_*.svg`).
